@@ -1,0 +1,118 @@
+package dev.vaileks.altarweaponsvl.weapons.shadowblade.listeners;
+import dev.vaileks.altarweaponsvl.integration.AltarTuning;
+
+import dev.vaileks.altarweaponsvl.AltarWeaponsVL;
+import dev.vaileks.altarweaponsvl.utils.WeaponFactory;
+import dev.vaileks.altarweaponsvl.weapons.shadowblade.managers.ShadowBladeManager;
+import org.bukkit.Location;
+import org.bukkit.Material;
+import org.bukkit.Particle;
+import org.bukkit.Sound;
+import org.bukkit.entity.LivingEntity;
+import org.bukkit.entity.Player;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.Listener;
+import org.bukkit.event.block.Action;
+import org.bukkit.event.entity.EntityDamageByEntityEvent;
+import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.event.player.PlayerSwapHandItemsEvent;
+import org.bukkit.inventory.EquipmentSlot;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.util.Vector;
+
+public class ShadowBladeListener implements Listener {
+   private final AltarWeaponsVL plugin;
+   private final ShadowBladeManager manager;
+
+   public ShadowBladeListener(AltarWeaponsVL plugin, ShadowBladeManager manager) {
+      this.plugin = plugin;
+      this.manager = manager;
+   }
+
+   public static boolean isShadowBlade(ItemStack item) {
+      return WeaponFactory.isAltarWeapon(item, "shadow_blade");
+   }
+
+   @EventHandler
+   public void onInteract(PlayerInteractEvent event) {
+      if (event.getHand() == EquipmentSlot.HAND) {
+         Player player = event.getPlayer();
+         Action action = event.getAction();
+         if (action == Action.RIGHT_CLICK_AIR || action == Action.RIGHT_CLICK_BLOCK) {
+            ItemStack item = player.getInventory().getItemInMainHand();
+            if (this.manager.activeLeaps.contains(player.getUniqueId())) {
+               if (System.currentTimeMillis() - this.manager.getLeapStartTime(player) > 300L) {
+                  this.manager.activeLeaps.remove(player.getUniqueId());
+               }
+
+               return;
+            }
+
+            if (!isShadowBlade(item)) {
+               return;
+            }
+
+            if (player.isSneaking()) {
+               this.manager.castShadowLeap(player);
+            }
+         }
+      }
+   }
+
+   @EventHandler
+   public void onSwapHand(PlayerSwapHandItemsEvent event) {
+      if (!event.isCancelled()) {
+         Player player = event.getPlayer();
+         ItemStack item = player.getInventory().getItemInMainHand();
+         if (isShadowBlade(item)) {
+            event.setCancelled(true);
+            this.manager.castShadowDaggers(player, item);
+         }
+      }
+   }
+
+   @EventHandler
+   public void onHit(EntityDamageByEntityEvent event) {
+      if (event.getDamager() instanceof Player player) {
+         if (event.getEntity() instanceof LivingEntity victim) {
+            ItemStack item = player.getInventory().getItemInMainHand();
+            if (isShadowBlade(item)) {
+               this.playShadowSweep(player, victim);
+               Vector victimDir = victim.getLocation().getDirection().setY(0).normalize();
+               Vector attackerDir = player.getLocation().getDirection().setY(0).normalize();
+               if (victimDir.dot(attackerDir) > 0.5) {
+                  this.manager.triggerBackstab(player, victim);
+               }
+            }
+         }
+      }
+   }
+
+   private void playShadowSweep(Player player, LivingEntity victim) {
+      Vector dir = player.getLocation().getDirection().normalize();
+      Location center = victim.getLocation().add(0.0, 1.0, 0.0).subtract(dir.clone().multiply(0.8));
+      center.getWorld().playSound(center,AltarTuning.sound("shadow_blade","visuals.sounds.item-trident-throw.sound",Sound.ITEM_TRIDENT_THROW),AltarTuning.volume("shadow_blade","visuals.sounds.item-trident-throw",1.0F),AltarTuning.pitch("shadow_blade","visuals.sounds.item-trident-throw",1.2F));
+      Vector right = dir.clone().crossProduct(new Vector(0, 1, 0)).normalize();
+      Vector up = right.clone().crossProduct(dir).normalize();
+      double rotAngle = Math.random() * Math.PI;
+      double cos = Math.cos(rotAngle);
+      double sin = Math.sin(rotAngle);
+      Object blockData = Material.BLACK_CONCRETE.createBlockData();
+      int step = 0;
+
+      for (double i = -1.4; i <= 1.4; i += 0.05) {
+         double x = i * cos;
+         double y = i * sin;
+         double z = -(i * i) * 0.25;
+         Vector point = right.clone().multiply(x).add(up.clone().multiply(y)).add(dir.clone().multiply(z));
+         point.multiply(1.15);
+         Location particleLoc = center.clone().add(point);
+         center.getWorld().spawnParticle(Particle.BLOCK, particleLoc,AltarTuning.particles("shadow_blade",1), 0.0, 0.0, 0.0, 0.0, blockData);
+         if (step % 2 == 0) {
+            center.getWorld().spawnParticle(Particle.CRIT, particleLoc,AltarTuning.particles("shadow_blade",1), 0.0, 0.0, 0.0, 0.0);
+         }
+
+         step++;
+      }
+   }
+}

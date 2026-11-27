@@ -1,0 +1,27 @@
+name: AltarWeaponsVL
+version: '1.3.0'
+main: dev.vaileks.altarweaponsvl.AltarWeaponsVL
+api-version: '1.21.4'
+author: Vaileks
+softdepend: [WorldGuard]
+commands:
+  altarweaponsvl:
+    description: Legendary weapons menu and administration
+    aliases: [awv, altarvl, rav, altarv, runesaltarv]
+    usage: /awv [menu|items|altar|give <player> <item>|reload|cooldown reset <player>]
+  friendlist:
+    description: Protect friends from your weapon abilities
+    aliases: [fl, trust]
+permissions:
+  altarweaponsvl.admin:
+    default: op
+    children:
+      runesaltarv.admin: true
+  altarweaponsvl.menu:
+    default: true
+    children:
+      runesaltarv.menu: true
+  runesaltarv.admin:
+    default: op
+  runesaltarv.menu:
+    default: true
